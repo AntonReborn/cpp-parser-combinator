@@ -1,0 +1,3 @@
+add_executable(parsecomb_bench parsecomb_bench.cpp)
+
+target_link_libraries(parsecomb_bench parsecomb benchmark::benchmark)

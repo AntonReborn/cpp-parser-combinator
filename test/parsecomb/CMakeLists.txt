@@ -1,0 +1,4 @@
+add_executable(parsecomb_test parsecomb_test.cpp)
+target_link_libraries(parsecomb_test PRIVATE parsecomb)
+
+AddTests(parsecomb_test)
