@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 #include <vector>
 
-#include "pc/parsecomb/parsecomb.h"
+#include "pc/parsecomb/sequence.h"
+#include "pc/parsecomb/units.h"
+#include "pc/parsecomb/multi.h"
 
 template<typename T>
 struct DebugLifetime {
@@ -78,9 +80,22 @@ bool operator==(const Point &lhs, const Point &rhs) {
     return std::make_tuple(lhs.x, lhs.y, lhs.z) == std::make_tuple(rhs.x, rhs.y, rhs.z);
 }
 
+template<typename T>
+bool operator== (const std::vector<T> &lhs, const std::vector<T> &rhs) {
+    if (lhs.size() != rhs.size())
+        return false;
+
+    for (size_t i = 0; i < lhs.size(); i++) {
+        if (lhs[i] != rhs[i])
+            return false;
+    }
+    
+    return true;
+}
+
 pc::ParseResult<Point> parse_point(pc::StringRef &input) {
     PC_LEAF_ASSIGN(_, pc::tag("Point: ")(input));
-    PC_LEAF_ASSIGN(result, pc::delimeted(
+    PC_LEAF_ASSIGN(result, pc::discard_surround(
                                    pc::tag("("),
                                    parse_coordinates,
                                    pc::tag(")"))(input));
@@ -103,4 +118,17 @@ TEST(SimpleParsing, PointEasySpaces) {
     auto point = parse_point(view).value();
     auto expected = Point{1, -1100, -12};
     EXPECT_EQ(point, expected);
+}
+
+TEST(SimpleParsing, PointEasyVecto) {
+    std::string input = "Point: (1,   -1100,-12); Point: (22, 33, 44); Point: (123, 12, -1);";
+    pc::StringRef view(input);
+
+    auto points_parser = pc::many_any(
+       pc::discard_terminated(parse_point, pc::tuple(pc::tag(";"), pc::spaces(0))));
+    auto point = points_parser(view).value();
+    auto expected = std::vector<Point>{Point{1, -1100, -12}, Point {22, 33, 44}, Point {123, 12, -1}};
+
+    EXPECT_EQ(point, expected);
+    EXPECT_EQ(view.size(), 0);
 }
