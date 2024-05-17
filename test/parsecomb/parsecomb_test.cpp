@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
+#include <variant>
 #include <vector>
 
-#include "pc/parsecomb/sequence.h"
-#include "pc/parsecomb/units.h"
+#include "pc/parsecomb/branch.h"
 #include "pc/parsecomb/multi.h"
+#include "pc/parsecomb/sequence.h"
+#include "pc/parsecomb/types.h"
+#include "pc/parsecomb/units.h"
 
 template<typename T>
 struct DebugLifetime {
@@ -81,7 +84,7 @@ bool operator==(const Point &lhs, const Point &rhs) {
 }
 
 template<typename T>
-bool operator== (const std::vector<T> &lhs, const std::vector<T> &rhs) {
+bool operator==(const std::vector<T> &lhs, const std::vector<T> &rhs) {
     if (lhs.size() != rhs.size())
         return false;
 
@@ -89,7 +92,7 @@ bool operator== (const std::vector<T> &lhs, const std::vector<T> &rhs) {
         if (lhs[i] != rhs[i])
             return false;
     }
-    
+
     return true;
 }
 
@@ -102,6 +105,12 @@ pc::ParseResult<Point> parse_point(pc::StringRef &input) {
 
     auto [x, y, z] = result.get();
     return Point{x, y, z};
+}
+
+pc::ParseResult<Point> parse_zero_point(pc::StringRef &input) {
+    PC_LEAF_ASSIGN(_, pc::tag("ZeroPoint")(input));
+
+    return Point{0, 0, 0};
 }
 
 TEST(SimpleParsing, PointEasy) {
@@ -120,15 +129,57 @@ TEST(SimpleParsing, PointEasySpaces) {
     EXPECT_EQ(point, expected);
 }
 
-TEST(SimpleParsing, PointEasyVecto) {
+TEST(SimpleParsing, PointEasyVector) {
     std::string input = "Point: (1,   -1100,-12); Point: (22, 33, 44); Point: (123, 12, -1);";
     pc::StringRef view(input);
 
     auto points_parser = pc::many_any(
-       pc::discard_terminated(parse_point, pc::tuple(pc::tag(";"), pc::spaces(0))));
+            pc::discard_terminated(parse_point, pc::tuple(pc::tag(";"), pc::spaces(0))));
     auto point = points_parser(view).value();
-    auto expected = std::vector<Point>{Point{1, -1100, -12}, Point {22, 33, 44}, Point {123, 12, -1}};
+    auto expected = std::vector<Point>{Point{1, -1100, -12}, Point{22, 33, 44}, Point{123, 12, -1}};
 
     EXPECT_EQ(point, expected);
     EXPECT_EQ(view.size(), 0);
+}
+
+TEST(SimpleParsing, PointEasyAltSameType) {
+    std::string input = "Point: (1,   -1100,-12);ZeroPoint";
+    {
+        pc::StringRef view(input);
+
+        auto points_or_circle = pc::alt(parse_point, parse_zero_point);
+        auto result1 = points_or_circle(view).value();
+        pc::tag(";")(view);
+        auto result2 = points_or_circle(view).value();
+
+        EXPECT_EQ(view.size(), 0);
+        EXPECT_EQ(result1.x, 1);
+        EXPECT_EQ(result1.z, -12);
+        EXPECT_EQ(result2.x, 0);
+        EXPECT_EQ(result2.z, 0);
+    }
+}
+
+struct Circle {
+    std::int32_t radius;
+};
+
+pc::ParseResult<Circle> parse_circle(pc::StringRef &input) {
+    PC_LEAF_ASSIGN(_, pc::tag("Circle: ")(input));
+    PC_LEAF_ASSIGN(radius, pc::int32()(input));
+    return Circle{radius};
+}
+
+TEST(SimpleParsing, PointEasyAltDifferentType) {
+    std::string input = "Point: (1,   -1100,-12); Circle: 123";
+    {
+        pc::StringRef view(input);
+        auto points_or_circle = pc::alt(parse_point, parse_circle);
+        auto result1 = points_or_circle(view).value();
+        pc::tag("; ")(view);
+        auto result2 = points_or_circle(view).value();
+
+        EXPECT_TRUE(std::holds_alternative<Point>(result1));
+        EXPECT_TRUE(std::holds_alternative<Circle>(result2));
+    }
 }
