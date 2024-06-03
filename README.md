@@ -2,7 +2,7 @@
 Parser combinator library for C++.
 
 ### Json Parser example
-Parser follows high-level grammar of [json.org](). 
+Json parser example follows precisely high-level parts of grammar from [json.org](http://www.json.org). 
 
 #### In memory data types
 ```c++
@@ -30,7 +30,7 @@ Value to_value(const Variant &var) {
 
 using Json = Value;
 ```
-#### Leaf element parsers
+#### Leaf element parsers (simplified)
 ```c++
 const auto ws = pc::chr(' ') | pc::chr('\n') | pc::chr('\t');
 const auto wss = many_any(ws);
