@@ -8,7 +8,6 @@
 
 namespace pc {
 
-
 template<typename P>
 auto alt(P parser) {
     using ValueT = typename std::invoke_result_t<P, StringRef &>::value_type;
@@ -35,12 +34,11 @@ auto alt(HeadP p_head, TailPs... p_tail) {
     };
 }
 
-// TODO: stict constraints?
-// template<typename HeadP, typename... TailPs>
-//     requires AllSame<std::invoke_result_t<HeadP, StringRef &>, std::invoke_result_t<TailPs, StringRef &>...>
-// auto operator|(HeadP p_head, TailPs... p_tail) {
-//     return alt(p_head, p_tail...);
-// }
+template<typename FirstP, typename SecondP>
+    requires AllSame<std::invoke_result_t<FirstP, StringRef &>, std::invoke_result_t<SecondP, StringRef &>>
+auto operator|(FirstP p_first, SecondP p_second) {
+    return alt(p_first, p_second);
+}
 
 template<typename... Parsers>
     requires(sizeof...(Parsers) > 1 &&
