@@ -15,7 +15,7 @@ auto alt(P parser) {
 
     return [parser](StringRef &input) -> ParseResult<ValueT> {
         ResultBuilder<ValueT> guard(input);
-        PC_LEAF_ASSIGN(result, parser(input));
+        PC_EXPECT_ASSIGN(result, parser(input));
 
         return guard.build(result);
     };
@@ -29,11 +29,18 @@ auto alt(HeadP p_head, TailPs... p_tail) {
     return [p_head, p_tail...](StringRef &input) -> ParseResult<ValueT> {
         ResultBuilder<ValueT> guard(input);
         auto result_with_error = p_head(input).or_else([&](auto) { return alt(p_tail...)(input); });
-        PC_LEAF_ASSIGN(result, result_with_error);
+        PC_EXPECT_ASSIGN(result, result_with_error);
 
         return guard.build(result);
     };
 }
+
+// TODO: stict constraints?
+// template<typename HeadP, typename... TailPs>
+//     requires AllSame<std::invoke_result_t<HeadP, StringRef &>, std::invoke_result_t<TailPs, StringRef &>...>
+// auto operator|(HeadP p_head, TailPs... p_tail) {
+//     return alt(p_head, p_tail...);
+// }
 
 template<typename... Parsers>
     requires(sizeof...(Parsers) > 1 &&

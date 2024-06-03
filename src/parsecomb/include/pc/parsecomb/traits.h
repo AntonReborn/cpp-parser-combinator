@@ -1,3 +1,4 @@
+#pragma once
 #include <concepts>
 #include <type_traits>
 
@@ -6,6 +7,12 @@ namespace pc {
 template<typename H, typename... Ts>
 struct first {
     using type = H;
+};
+
+template<typename T>
+concept Eq = requires(T a, T b)
+{
+    a == b;
 };
 
 template<typename T, typename... Ts>
@@ -27,8 +34,10 @@ static_assert(!has_duplicates_with<int>::value, "has_duplicates_with test failed
 static_assert(has_duplicates_with<int, float, double, float>::value, "has_duplicates_with test failed");
 static_assert(has_duplicates_with<int, int>::value, "has_duplicates_with test failed");
 static_assert(!has_duplicates_with<int>::value, "has_duplicates_with test failed");
+static_assert(!has_duplicates_with<std::string, int>::value, "has_duplicates_with test failed");
 
 template<typename... Ts>
 concept AllUnique = !has_duplicates_with<Ts...>::value;
 
+void print_typename(auto) requires false {}
 }// namespace pc

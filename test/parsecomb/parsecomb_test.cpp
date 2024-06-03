@@ -8,24 +8,28 @@
 #include "pc/parsecomb/types.h"
 #include "pc/parsecomb/units.h"
 
-template<typename T>
+template<typename T, bool Enabled = true>
 struct DebugLifetime {
     T value;
     std::string name;
 
     DebugLifetime(const T &val, const std::string &n) : value(val), name(n) {
+        if (!Enabled) return;
         std::cout << "Constructed " << name << " with value: " << std::endl;
     }
 
     DebugLifetime(T &&val, const std::string &n) : value(std::move(val)), name(n) {
+        if (!Enabled) return;
         std::cout << "Move constructed " << name << " with value: " << std::endl;
     }
 
     DebugLifetime(const DebugLifetime &other) : value(other.value), name(other.name) {
+        if (!Enabled) return;
         std::cout << "Copy constructed " << name << " with value: " << std::endl;
     }
 
     DebugLifetime(DebugLifetime &&other) noexcept : value(std::move(other.value)), name(std::move(other.name)) {
+        if (!Enabled) return;
         std::cout << "Move constructed (from DebugLifetime) " << name << " with value: " << std::endl;
     }
 
@@ -33,6 +37,7 @@ struct DebugLifetime {
         if (this != &other) {
             value = other.value;
             name = other.name;
+            if (!Enabled) return *this;
             std::cout << "Copy assigned (from DebugLifetime) " << name << " with value: " << std::endl;
         }
         return *this;
@@ -42,12 +47,14 @@ struct DebugLifetime {
         if (this != &other) {
             value = std::move(other.value);
             name = std::move(other.name);
+            if (!Enabled) return;
             std::cout << "Move assigned (from DebugLifetime) " << name << " with value: " << std::endl;
         }
         return *this;
     }
 
     ~DebugLifetime() {
+        if (!Enabled) return;
         std::cout << "Destroyed " << name << " with value: " << std::endl;
     }
 
@@ -56,21 +63,21 @@ struct DebugLifetime {
 };
 
 pc::ParseResult<pc::NothingT> separator(pc::StringRef &input) {
-    PC_LEAF_ASSIGN(_, pc::tuple(pc::tag(","), pc::spaces(0))(input));
+    PC_EXPECT_ASSIGN(_, pc::tuple(pc::tag(","), pc::spaces(0))(input));
 
     return pc::Nothing;
 }
 
-using Coordinates = DebugLifetime<std::tuple<std::int32_t, std::int32_t, std::int32_t>>;
+using Coordinates = DebugLifetime<std::tuple<std::int32_t, std::int32_t, std::int32_t>, false>;
 pc::ParseResult<Coordinates> parse_coordinates(pc::StringRef &input) {
-    PC_LEAF_ASSIGN(result, pc::tuple(pc::int32(),
+    PC_EXPECT_ASSIGN(result, pc::tuple(pc::int32(),
                                      separator,
                                      pc::int32(),
                                      separator,
                                      pc::int32())(input));
 
     auto [x, _, y, __, z] = result;
-    return DebugLifetime(std::make_tuple(x, y, z), "{coordinate}");
+    return DebugLifetime<std::tuple<std::int32_t, std::int32_t, std::int32_t>, false>(std::make_tuple(x, y, z), "{coordinate}");
 }
 
 struct Point {
@@ -97,8 +104,8 @@ bool operator==(const std::vector<T> &lhs, const std::vector<T> &rhs) {
 }
 
 pc::ParseResult<Point> parse_point(pc::StringRef &input) {
-    PC_LEAF_ASSIGN(_, pc::tag("Point: ")(input));
-    PC_LEAF_ASSIGN(result, pc::discard_surround(
+    PC_EXPECT_ASSIGN(_, pc::tag("Point: ")(input));
+    PC_EXPECT_ASSIGN(result, pc::discard_surround(
                                    pc::tag("("),
                                    parse_coordinates,
                                    pc::tag(")"))(input));
@@ -108,7 +115,7 @@ pc::ParseResult<Point> parse_point(pc::StringRef &input) {
 }
 
 pc::ParseResult<Point> parse_zero_point(pc::StringRef &input) {
-    PC_LEAF_ASSIGN(_, pc::tag("ZeroPoint")(input));
+    PC_EXPECT_ASSIGN(_, pc::tag("ZeroPoint")(input));
 
     return Point{0, 0, 0};
 }
@@ -165,8 +172,8 @@ struct Circle {
 };
 
 pc::ParseResult<Circle> parse_circle(pc::StringRef &input) {
-    PC_LEAF_ASSIGN(_, pc::tag("Circle: ")(input));
-    PC_LEAF_ASSIGN(radius, pc::int32()(input));
+    PC_EXPECT_ASSIGN(_, pc::tag("Circle: ")(input));
+    PC_EXPECT_ASSIGN(radius, pc::int32()(input));
     return Circle{radius};
 }
 

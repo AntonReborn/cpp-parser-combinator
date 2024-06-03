@@ -5,7 +5,15 @@
 #include <string_view>
 #include <variant>
 
-#define PC_LEAF_ASSIGN(var, exp)                                       \
+#define PC_EXPECT(exp)                             \
+    {                                              \
+        auto _temp = exp;                          \
+        if (!_temp.has_value()) {                  \
+            return std::unexpected(_temp.error()); \
+        }                                          \
+    }
+
+#define PC_EXPECT_ASSIGN(var, exp)                                     \
     auto &&var##_temp = exp;                                           \
     if (!var##_temp.has_value()) {                                     \
         return std::unexpected(var##_temp.error());                    \
