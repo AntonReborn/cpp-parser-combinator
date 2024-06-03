@@ -2,26 +2,37 @@
 
 #include "pc/parsecomb/types.h"
 #include "pc/parsecomb/units.h"
+#include "pc/parsecomb/functional.h"
 #include "sequence.h"
 
 #include <expected>
-#include <type_traits>
 #include <vector>
 
 namespace pc {
 
-// TODO: parametrize policy, GREEDY right now.
+template<typename T, typename F>
+using Aggregator = std::tuple<T, F>;
+
+// Add perfect forwarding
+template<typename T>
+using VectorAggregator = std::tuple<std::vector<T>, decltype([](auto& acc, auto&& x) { acc.push_back(x); })>;
+
+using StringAggregator = std::tuple<std::string, decltype([](auto& acc, auto&& x) { acc.push_back(x); })>;
+
+template<typename K, typename V>
+using TupleToMapAggregator = std::tuple<std::map<K, V>, decltype([](auto& acc, auto&& x) { acc[std::get<0>(x)] = std::get<1>(x); })>;
+
 template<typename P, typename T, typename F>
-auto fold_many_lower_upper(size_t lower, size_t upper, P parser, T init, F f) {
-    return [lower, upper, parser, init, f](StringRef &input) -> ParseResult<T> {
+auto fold_many_lower_upper(size_t lower, size_t upper, P parser, Aggregator<T, F> aggregator) {
+    return [lower, upper, parser, aggregator](StringRef &input) -> ParseResult<T> {
         ResultBuilder<T> guard(input);
-        auto result = init;
+        auto result = std::get<0>(aggregator);
         size_t i = 0;
 
         for (; i < upper; i++) {
             auto one_more = parser(input);
             if (one_more)
-                f(result, one_more.value());
+                std::get<1>(aggregator)(result, one_more.value());
             else
                 break;
         }
@@ -34,23 +45,20 @@ auto fold_many_lower_upper(size_t lower, size_t upper, P parser, T init, F f) {
 }
 
 template<typename P, typename T, typename F>
-auto fold_many_any(P parser, T init, F f) {
-    return fold_many_lower_upper(0, pc::InfMany, parser, init, f);
+auto fold_many_any(P parser, const Aggregator<T, F>& aggregator) {
+    return fold_many_lower_upper(0, pc::InfMany, parser, aggregator);
 }
 
 template<typename P, typename T, typename F>
-auto fold_many_more(size_t lower, P parser, T init, F f) {
-    return fold_many_lower_upper(lower, pc::InfMany, parser, init, f);
+auto fold_many_more(size_t lower, P parser, const Aggregator<T, F>& aggregator) {
+    return fold_many_lower_upper(lower, pc::InfMany, parser, aggregator);
 }
 
 template<typename P>
 auto many_lower_upper(size_t lower, size_t upper, P parser) {
     using ItemType = typename std::invoke_result_t<P, StringRef &>::value_type;
 
-    return fold_many_lower_upper(lower, upper, parser, std::vector<ItemType>{},
-                                 [](auto &accumulator, auto&&new_element) {
-                                     accumulator.push_back(std::forward<decltype(new_element)>(new_element));
-                                 });
+    return fold_many_lower_upper(lower, upper, parser, VectorAggregator<ItemType>());
 }
 
 template<typename P>
@@ -70,14 +78,14 @@ auto maybe_ignore(P parser) {
 }
 
 template<typename P, typename S, typename T, typename F>
-auto fold_any_separated_by(P parser, S separator, T init, F f) {
-    return [parser, separator, init, f](StringRef &input) -> ParseResult<T> {
+auto fold_any_separated_by(P parser, S separator, Aggregator<T, F> aggregator) {
+    return [parser, separator, aggregator](StringRef &input) -> ParseResult<T> {
         ResultBuilder<T> guard(input);
 
-        PC_EXPECT_ASSIGN(prefix, fold_many_any(pc::discard_terminated(parser, separator), init, f)(input));
+        PC_EXPECT_ASSIGN(prefix, fold_many_any(pc::take<0>(parser, separator), aggregator)(input));
         PC_EXPECT_ASSIGN(suffix, parser(input));
 
-        f(prefix, suffix);
+        std::get<F>(aggregator)(prefix, suffix);
 
         return guard.build(std::move(prefix));
     };
@@ -87,9 +95,7 @@ template<typename P, typename S>
 auto many_any_separated_by(P parser, S separator) {
     using ItemType = typename std::invoke_result_t<P, StringRef &>::value_type;
 
-    return fold_any_separated_by(parser, separator, std::vector<ItemType>{}, [](auto &accumulator, auto &&new_element) {
-        accumulator.push_back(std::forward<decltype(new_element)>(new_element));
-    });
+    return fold_any_separated_by(parser, separator, VectorAggregator<ItemType>{});
 }
 
 }// namespace pc

@@ -7,23 +7,6 @@
 
 namespace pc {
 
-template<typename Parser, typename EmitT>
-auto to(Parser p, EmitT emit) {
-    return [p, emit](StringRef& input) -> ParseResult<decltype(emit)> {
-        PC_EXPECT(p(input));
-        return emit;
-    };
-}
-
-template<typename Parser, typename F>
-auto map(Parser p, F f) {
-    return [p, f](StringRef& input) -> ParseResult<std::invoke_result_t<F, typename std::invoke_result_t<Parser, StringRef&>::value_type>> {
-        PC_EXPECT_ASSIGN(result, p(input));
-
-        return f(result);
-    };
-}
-
 inline auto char_range(char from, char to) {
     return [from, to](StringRef &input) -> ParseResult<char> {
         ResultBuilder<char> guard(input);
@@ -40,7 +23,7 @@ inline auto char_range(char from, char to) {
     };
 }
 
-inline auto char_exact(char ch) {
+inline auto chr(char ch) {
     return char_range(ch, ch);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pc/parsecomb/types.h"
+#include "pc/parsecomb/functional.h"
 
 #include <type_traits>
 #include <tuple>
@@ -34,38 +35,14 @@ auto tuple(HeadP p_head, TailPs... p_tail) {
     };
 }
 
-template<typename Open, typename Parser, typename Close>
-auto discard_surround(Open open_parser, Parser parser, Close close_parser) {
-    using ValueT = std::invoke_result_t<Parser, StringRef &>::value_type;
-    return [open_parser, parser, close_parser](StringRef &input) -> ParseResult<ValueT> {
-        ResultBuilder<ValueT> guard(input);
-        return open_parser(input)
-                .and_then([&](auto) { return parser(input); })
-                .and_then([&](auto to_return) {
-                    return close_parser(input).transform([&to_return, &guard](auto) { return guard.build(std::move(to_return)); });
-                });
-    };
+template<std::size_t Idx, typename... Parsers>
+auto take(Parsers... parsers) {
+    return map(tuple(parsers...), [](const auto& tp) { return std::get<Idx>(tp); });
 }
 
-template<typename Preceed, typename Parser>
-auto discard_preceded(Preceed to_discard, Parser parser) {
-    using ValueT = std::invoke_result_t<Parser, StringRef &>::value_type;
-    return [to_discard, parser](StringRef &input) -> ParseResult<ValueT> {
-        ResultBuilder<ValueT> guard(input);
-        return to_discard(input)
-                .and_then([&](auto) { guard.keep(); return parser(input); });
-    };
+template<std::size_t Idx1, std::size_t Idx2, typename... Parsers>
+auto take(Parsers... parsers) {
+    return map(tuple(parsers...), [](const auto& tp) { return std::make_tuple(std::get<Idx1>(tp), std::get<Idx2>(tp)); });
 }
 
-template<typename Parser, typename Terminate>
-auto discard_terminated(Parser parser, Terminate to_discard) {
-    using ValueT = std::invoke_result_t<Parser, StringRef &>::value_type;
-    return [parser, to_discard](StringRef &input) -> ParseResult<ValueT> {
-        ResultBuilder<ValueT> guard(input);
-        return parser(input)
-                .and_then([&](auto to_return) { 
-                    return to_discard(input).transform([&to_return, &guard](auto) { return guard.build(std::move(to_return)); });
-        });
-    };
-}
 }// namespace pc

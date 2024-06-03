@@ -6,6 +6,8 @@
 #include "pc/parsecomb/multi.h"
 #include "pc/parsecomb/sequence.h"
 #include "pc/parsecomb/types.h"
+
+#include "pc/parsecomb/functional.h"
 #include "pc/parsecomb/units.h"
 
 template<typename T, bool Enabled = true>
@@ -71,10 +73,10 @@ pc::ParseResult<pc::NothingT> separator(pc::StringRef &input) {
 using Coordinates = DebugLifetime<std::tuple<std::int32_t, std::int32_t, std::int32_t>, false>;
 pc::ParseResult<Coordinates> parse_coordinates(pc::StringRef &input) {
     PC_EXPECT_ASSIGN(result, pc::tuple(pc::int32(),
-                                     separator,
-                                     pc::int32(),
-                                     separator,
-                                     pc::int32())(input));
+                                       separator,
+                                       pc::int32(),
+                                       separator,
+                                       pc::int32())(input));
 
     auto [x, _, y, __, z] = result;
     return DebugLifetime<std::tuple<std::int32_t, std::int32_t, std::int32_t>, false>(std::make_tuple(x, y, z), "{coordinate}");
@@ -105,10 +107,10 @@ bool operator==(const std::vector<T> &lhs, const std::vector<T> &rhs) {
 
 pc::ParseResult<Point> parse_point(pc::StringRef &input) {
     PC_EXPECT_ASSIGN(_, pc::tag("Point: ")(input));
-    PC_EXPECT_ASSIGN(result, pc::discard_surround(
-                                   pc::tag("("),
-                                   parse_coordinates,
-                                   pc::tag(")"))(input));
+    PC_EXPECT_ASSIGN(result, take<1>(
+                                     pc::tag("("),
+                                     parse_coordinates,
+                                     pc::tag(")"))(input));
 
     auto [x, y, z] = result.get();
     return Point{x, y, z};
@@ -141,7 +143,7 @@ TEST(SimpleParsing, PointEasyVector) {
     pc::StringRef view(input);
 
     auto points_parser = pc::many_any(
-            pc::discard_terminated(parse_point, pc::tuple(pc::tag(";"), pc::spaces(0))));
+            pc::take<0>(parse_point, pc::tuple(pc::tag(";"), pc::spaces(0))));
     auto point = points_parser(view).value();
     auto expected = std::vector<Point>{Point{1, -1100, -12}, Point{22, 33, 44}, Point{123, 12, -1}};
 
